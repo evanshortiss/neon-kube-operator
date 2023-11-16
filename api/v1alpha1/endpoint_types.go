@@ -63,6 +63,8 @@ type EndpointStatus struct {
 	State        EndpointState `json:"state"`
 	Message      string        `json:"message,omitempty"`
 	Id           string        `json:"id"`
+	BranchId     string        `json:"branchId"`
+	ProjectId    string        `json:"projectId"`
 	Host         string        `json:"host"`
 	CurrentState string        `json:"currentState"`
 	PendingState string        `json:"pendingState"`

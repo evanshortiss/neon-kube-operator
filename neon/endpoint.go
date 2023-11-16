@@ -135,11 +135,7 @@ func GetBranchProjectId(ctx context.Context, k8sClient client.Client, e *neontec
 }
 
 func (c *Client) DeleteEndpoint(ctx context.Context, k8sClient client.Client, e *neontechv1alpha1.Endpoint) (map[string]any, error) {
-	_, projectId, err := GetBranchProjectId(ctx, k8sClient, e)
-	if err != nil {
-		return nil, err
-	}
-	url := fmt.Sprintf("https://console.neon.tech/api/v2/projects/%s/endpoints/%s", projectId, e.Status.Id)
+	url := fmt.Sprintf("https://console.neon.tech/api/v2/projects/%s/endpoints/%s", e.Status.ProjectId, e.Status.Id)
 	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
 	if err != nil {
 		return nil, err

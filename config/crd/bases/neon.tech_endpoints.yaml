@@ -80,6 +80,8 @@ spec:
           status:
             description: EndpointStatus defines the observed state of Endpoint
             properties:
+              branchId:
+                type: string
               createdAt:
                 type: string
               currentState:
@@ -92,16 +94,20 @@ spec:
                 type: string
               pendingState:
                 type: string
+              projectId:
+                type: string
               state:
                 type: string
               updateAt:
                 type: string
             required:
+            - branchId
             - createdAt
             - currentState
             - host
             - id
             - pendingState
+            - projectId
             - state
             - updateAt
             type: object

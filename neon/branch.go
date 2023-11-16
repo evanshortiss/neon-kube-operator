@@ -172,6 +172,8 @@ func NewEndpointStatus(response map[string]any) neontechv1alpha1.EndpointStatus 
 		es.Host, _ = branch["host"].(string)
 		es.CreatedAt, _ = branch["created_at"].(string)
 		es.UpdatedAt, _ = branch["updated_at"].(string)
+		es.ProjectId, _ = branch["project_id"].(string)
+		es.BranchId, _ = branch["branch_id"].(string)
 	}
 
 	return es

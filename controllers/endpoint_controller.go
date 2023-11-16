@@ -110,7 +110,7 @@ func (r *EndpointReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	if errors.Is(err, neon.ErrRetryAgain) {
-		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+		return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
 	}
 	return ctrl.Result{}, err
 }
