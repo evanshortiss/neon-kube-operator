@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: neon-kube-operator-deployment
+  namespace: neon-operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: neon-kube-operator
+  template:
+    metadata:
+      labels:
+        app: neon-kube-operator
+    spec:
+      containers:
+      - name: neon-kube-operator
+        image: quay.io/evanshortiss/neon-kube-operator:latest
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "512Mi"
+          limits:
+            cpu: "1"
+            memory: "1Gi"
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+      serviceAccountName: neon-kube-operator-service-account
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: neon-kube-operator-service-account
+  namespace: neon-operator
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: secret-creator-deleter
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["create", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: secret-creator-deleter-binding
+subjects:
+- kind: ServiceAccount
+  name: neon-kube-operator-service-account
+  namespace: neon-operator
+roleRef:
+  kind: ClusterRole
+  name: secret-creator-deleter
+  apiGroup: rbac.authorization.k8s.io

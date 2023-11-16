@@ -1,0 +1,5 @@
+## Append samples you want in your CSV to this file as resources ##
+resources:
+- neon.tech_v1alpha1_branch.yaml
+- neon.tech_v1alpha1_endpoint.yaml
+#+kubebuilder:scaffold:manifestskustomizesamples

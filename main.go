@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"flag"
 	"os"
 
@@ -24,12 +25,18 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+
+	neontechv1alpha1 "github.com/evanshortiss/neon-kube-operator/api/v1alpha1"
+	"github.com/evanshortiss/neon-kube-operator/controllers"
+	"github.com/evanshortiss/neon-kube-operator/neon"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -38,9 +45,16 @@ var (
 	setupLog = ctrl.Log.WithName("setup")
 )
 
+const (
+	neonOperatorNs         = "neon-operator"
+	neonSecretName         = "neon-operator-secrets"
+	neonApiKeyPropertyName = "neon-api-key"
+)
+
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
+	utilruntime.Must(neontechv1alpha1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -67,7 +81,7 @@ func main() {
 		Port:                   9443,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "53dfb867.neon.com",
+		LeaderElectionID:       "53dfb867.neon.tech",
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
 		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
@@ -85,6 +99,35 @@ func main() {
 		os.Exit(1)
 	}
 
+	// TODO: parameterise secret namespace and name?
+	secret := &corev1.Secret{}
+	err = mgr.GetClient().Get(context.Background(), client.ObjectKey{Namespace: neonOperatorNs, Name: neonSecretName}, secret)
+	if err != nil {
+		setupLog.Error(err, "unable to read neon-api-key secret")
+		os.Exit(1)
+	}
+
+	apiKey, exists := secret.Data["api-key"]
+	if !exists {
+		setupLog.Error(err, "key named '%s' is missing in '%s' secret", neonApiKeyPropertyName, neonSecretName)
+		os.Exit(1)
+	}
+
+	if err = (&controllers.BranchReconciler{
+		Client:     mgr.GetClient(),
+		Scheme:     mgr.GetScheme(),
+		NeonClient: neon.CreateClient(string(apiKey)),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Branch")
+		os.Exit(1)
+	}
+	if err = (&controllers.EndpointReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Endpoint")
+		os.Exit(1)
+	}
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {

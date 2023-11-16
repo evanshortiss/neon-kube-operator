@@ -1,0 +1,12 @@
+apiVersion: neon.tech.neon.tech/v1alpha1
+kind: Endpoint
+metadata:
+  labels:
+    app.kubernetes.io/name: endpoint
+    app.kubernetes.io/instance: endpoint-sample
+    app.kubernetes.io/part-of: hackneon-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: hackneon-operator
+  name: endpoint-sample
+spec:
+  # TODO(user): Add fields here

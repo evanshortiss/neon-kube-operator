@@ -1,0 +1,27 @@
+# permissions for end users to view branches.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: branch-viewer-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: hackneon-operator
+    app.kubernetes.io/part-of: hackneon-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: branch-viewer-role
+rules:
+- apiGroups:
+  - neon.tech
+  resources:
+  - branches
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - neon.tech
+  resources:
+  - branches/status
+  verbs:
+  - get
