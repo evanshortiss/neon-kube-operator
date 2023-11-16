@@ -38,9 +38,9 @@ type EndpointReconciler struct {
 	NeonClient *neon.Client
 }
 
-//+kubebuilder:rbac:groups=neon.tech.neon.tech,resources=endpoints,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=neon.tech.neon.tech,resources=endpoints/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=neon.tech.neon.tech,resources=endpoints/finalizers,verbs=update
+//+kubebuilder:rbac:groups=neon.tech,resources=endpoints,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=neon.tech,resources=endpoints/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=neon.tech,resources=endpoints/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.

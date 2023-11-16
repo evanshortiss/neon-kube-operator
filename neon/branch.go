@@ -15,7 +15,7 @@ import (
 func branchSpecToCreateRequestBody(branchSpec *neontechv1alpha1.BranchSpec) map[string]any {
 	body := make(map[string]any)
 
-	if branchSpec.ParentId != nil || branchSpec.ParentStartPoint != nil || branchSpec.ParentStartPoint.Lsn != nil || branchSpec.ParentStartPoint.Timestamp != nil {
+	if branchSpec.ParentId != nil || (branchSpec.ParentStartPoint != nil && (branchSpec.ParentStartPoint.Lsn != nil || branchSpec.ParentStartPoint.Timestamp != nil)) {
 		branch := make(map[string]any)
 
 		if branchSpec.ParentId != nil {
@@ -60,7 +60,7 @@ func (c *Client) CreateBranch(ctx context.Context, branchSpec *neontechv1alpha1.
 
 	defer resp.Body.Close()
 	if resp.StatusCode != 201 {
-		return nil, fmt.Errorf("Failed to create branch: %s", resp.Status)
+		return nil, fmt.Errorf("failed to create branch: %s", resp.Status)
 	}
 
 	data, err := io.ReadAll(resp.Body)
@@ -93,7 +93,7 @@ func (c *Client) DeleteBranch(ctx context.Context, branch *neontechv1alpha1.Bran
 
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 && resp.StatusCode != 404 {
-		return nil, fmt.Errorf("Failed to create branch: %s", resp.Status)
+		return nil, fmt.Errorf("failed to create branch: %s", resp.Status)
 	}
 
 	data, err := io.ReadAll(resp.Body)
@@ -111,7 +111,7 @@ func (c *Client) DeleteBranch(ctx context.Context, branch *neontechv1alpha1.Bran
 }
 
 var (
-	BranchNotFound = errors.New("Branch not found")
+	BranchNotFound = errors.New("branch not found")
 )
 
 func (c *Client) GetBranch(ctx context.Context, name string, spec *neontechv1alpha1.BranchSpec) (map[string]any, error) {

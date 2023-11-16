@@ -19,6 +19,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"os"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -112,9 +113,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	apiKey, exists := secret.Data[neonSecretName]
+	apiKey, exists := secret.Data[neonApiKeyPropertyName]
 	if !exists {
-		setupLog.Error(err, "key named '%s' is missing in '%s' secret", neonApiKeyPropertyName, neonSecretName)
+		setupLog.Error(err, fmt.Sprintf("key named '%s' is missing in '%s' secret", neonApiKeyPropertyName, neonSecretName))
 		os.Exit(1)
 	}
 

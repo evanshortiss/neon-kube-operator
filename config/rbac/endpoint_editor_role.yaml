@@ -12,7 +12,7 @@ metadata:
   name: endpoint-editor-role
 rules:
 - apiGroups:
-  - neon.tech.neon.tech
+  - neon.tech
   resources:
   - endpoints
   verbs:
@@ -24,7 +24,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - neon.tech.neon.tech
+  - neon.tech
   resources:
   - endpoints/status
   verbs:

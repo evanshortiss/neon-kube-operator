@@ -12,7 +12,7 @@ metadata:
   name: endpoint-viewer-role
 rules:
 - apiGroups:
-  - neon.tech.neon.tech
+  - neon.tech
   resources:
   - endpoints
   verbs:
@@ -20,7 +20,7 @@ rules:
   - list
   - watch
 - apiGroups:
-  - neon.tech.neon.tech
+  - neon.tech
   resources:
   - endpoints/status
   verbs:

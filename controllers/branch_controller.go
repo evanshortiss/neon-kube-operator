@@ -112,7 +112,7 @@ func (r *BranchReconciler) reconcile(ctx context.Context, branch *neontechv1alph
 	resp, err := r.NeonClient.GetBranch(ctx, branch.Name, &branch.Spec)
 	shouldCreate := false
 	if err != nil {
-		if errors.Is(err, neon.BranchNotFound) {
+		if !errors.Is(err, neon.BranchNotFound) {
 			return err
 		}
 

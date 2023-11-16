@@ -3,7 +3,7 @@
 # It should be run by config/default
 resources:
 - bases/neon.tech_branches.yaml
-- bases/neon.tech.neon.tech_endpoints.yaml
+- bases/neon.tech_endpoints.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:

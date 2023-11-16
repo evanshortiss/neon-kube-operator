@@ -1,4 +1,4 @@
-apiVersion: neon.tech.neon.tech/v1alpha1
+apiVersion: neon.tech/v1alpha1
 kind: Endpoint
 metadata:
   labels:
