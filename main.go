@@ -23,14 +23,14 @@ import (
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
+	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
@@ -75,7 +75,8 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	cfg := ctrl.GetConfigOrDie()
+	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
 		Scheme:                 scheme,
 		MetricsBindAddress:     metricsAddr,
 		Port:                   9443,
@@ -99,15 +100,19 @@ func main() {
 		os.Exit(1)
 	}
 
+	clientset, err := kubernetes.NewForConfig(cfg)
+	if err != nil {
+		setupLog.Error(err, "unable to create client")
+		os.Exit(1)
+	}
 	// TODO: parameterise secret namespace and name?
-	secret := &corev1.Secret{}
-	err = mgr.GetClient().Get(context.Background(), client.ObjectKey{Namespace: neonOperatorNs, Name: neonSecretName}, secret)
+	secret, err := clientset.CoreV1().Secrets(neonOperatorNs).Get(context.Background(), neonSecretName, v1.GetOptions{})
 	if err != nil {
 		setupLog.Error(err, "unable to read neon-api-key secret")
 		os.Exit(1)
 	}
 
-	apiKey, exists := secret.Data["api-key"]
+	apiKey, exists := secret.Data[neonSecretName]
 	if !exists {
 		setupLog.Error(err, "key named '%s' is missing in '%s' secret", neonApiKeyPropertyName, neonSecretName)
 		os.Exit(1)
