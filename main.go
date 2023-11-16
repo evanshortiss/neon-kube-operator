@@ -119,17 +119,19 @@ func main() {
 		os.Exit(1)
 	}
 
+	neonClient := neon.CreateClient(string(apiKey))
 	if err = (&controllers.BranchReconciler{
 		Client:     mgr.GetClient(),
 		Scheme:     mgr.GetScheme(),
-		NeonClient: neon.CreateClient(string(apiKey)),
+		NeonClient: neonClient,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Branch")
 		os.Exit(1)
 	}
 	if err = (&controllers.EndpointReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:     mgr.GetClient(),
+		Scheme:     mgr.GetScheme(),
+		NeonClient: neonClient,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Endpoint")
 		os.Exit(1)

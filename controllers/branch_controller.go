@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -56,11 +57,15 @@ type BranchReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
 func (r *BranchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	logger := log.FromContext(ctx)
 
 	b := &neontechv1alpha1.Branch{}
 	err := r.Client.Get(ctx, req.NamespacedName, b)
 	if err != nil {
+		if kerrors.IsNotFound(err) {
+			logger.Info("branch resource not found. Ignoring since object must be deleted")
+			return ctrl.Result{}, nil
+		}
 		return ctrl.Result{}, err
 	}
 	if err = AddFinalizer(ctx, r.Client, b); err != nil {
@@ -76,6 +81,11 @@ func (r *BranchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	err = r.reconcile(ctx, b)
+	if err != nil {
+		b.Status.Message = err.Error()
+	} else {
+		b.Status.Reset()
+	}
 
 	tries := 0
 	for tries < 5 {
@@ -115,7 +125,7 @@ func (r *BranchReconciler) reconcile(ctx context.Context, branch *neontechv1alph
 	resp, err := r.NeonClient.GetBranch(ctx, branch.Name, branch)
 	shouldCreate := false
 	if err != nil {
-		if !errors.Is(err, neon.BranchNotFound) {
+		if !errors.Is(err, neon.ErrBranchNotFound) {
 			return err
 		}
 
@@ -123,10 +133,11 @@ func (r *BranchReconciler) reconcile(ctx context.Context, branch *neontechv1alph
 	}
 	if !shouldCreate {
 		branch.Status = neon.NewBranchStatus(resp)
+		branch.Status.State = neontechv1alpha1.BranchStateCreated
 		return nil
 	}
 	logger.Info("Creating branch", "name", branch.Name)
-	resp, err = r.NeonClient.CreateBranch(ctx, &branch.Spec)
+	resp, err = r.NeonClient.CreateBranch(ctx, branch)
 	if err != nil {
 		return err
 	}
@@ -146,13 +157,6 @@ func AddFinalizer(ctx context.Context, c client.Client, object client.Object) er
 		logger.Info("Finalizer added into custom resource successfully")
 	}
 	return nil
-}
-
-func (r *BranchReconciler) updateStatusIfChanged(ctx context.Context, old, new *neontechv1alpha1.Branch) error {
-	if old.Status.State == new.Status.State {
-		return nil
-	}
-	return r.Client.Status().Update(ctx, new)
 }
 
 func (r *BranchReconciler) updateState(ctx context.Context, branch *neontechv1alpha1.Branch, state neontechv1alpha1.BranchState) error {

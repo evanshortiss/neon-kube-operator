@@ -57,6 +57,8 @@ spec:
                 type: string
               id:
                 type: string
+              message:
+                type: string
               name:
                 type: string
               parentId:
@@ -74,6 +76,7 @@ spec:
             required:
             - createdAt
             - id
+            - message
             - name
             - parentId
             - parentLsn

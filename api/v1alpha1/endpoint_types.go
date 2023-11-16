@@ -27,11 +27,9 @@ import (
 type EndpointSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
-
-	ProjectId             string            `json:"projectId"`
-	BranchId              string            `json:"branchId"`
-	RegionId              *string           `json:"regionId,omitempty"`
+	BranchFrom            BranchFrom        `json:"from"`
 	Type                  string            `json:"type"`
+	RegionId              *string           `json:"regionId,omitempty"`
 	Settings              map[string]string `json:"settings,omitempty"`
 	AutoscalingLimitMinCu *int              `json:"autoscalingLimitMinCu,omitempty"`
 	AutoscalingLimitMaxCu *int              `json:"autoscalingLimitMaxCu,omitempty"`
@@ -43,12 +41,36 @@ type EndpointSpec struct {
 	SuspendTimeoutSeconds *int64            `json:"suspendTimeoutSeconds,omitempty"`
 }
 
+type BranchFrom struct {
+	BranchRef string `json:"branchRef,omitempty"`
+	ProjectId string `json:"projectId,omitempty"`
+	BranchId  string `json:"branchId,omitempty"`
+}
+
+type EndpointType string
+
+const (
+	EndpointTypeReadOnly  EndpointType = "read_only"
+	EndpointTypeReadWrite EndpointType = "read_write"
+)
+
 // EndpointStatus defines the observed state of Endpoint
 type EndpointStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	State EndpointState `json:"state"`
+	State        EndpointState `json:"state"`
+	Message      string        `json:"message,omitempty"`
+	Id           string        `json:"id"`
+	Host         string        `json:"host"`
+	CurrentState string        `json:"currentState"`
+	PendingState string        `json:"pendingState"`
+	CreatedAt    string        `json:"createdAt"`
+	UpdatedAt    string        `json:"updateAt"`
+}
+
+func (es *EndpointStatus) Reset() {
+	es.Message = ""
 }
 
 type EndpointState string

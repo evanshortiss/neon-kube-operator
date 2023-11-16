@@ -19,7 +19,9 @@ package controllers
 import (
 	"context"
 	"errors"
+	"time"
 
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -54,10 +56,14 @@ type EndpointReconciler struct {
 func (r *EndpointReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	var err error
 
-	_ = log.FromContext(ctx)
+	logger := log.FromContext(ctx)
 
 	e := &neontechv1alpha1.Endpoint{}
 	if err = r.Client.Get(ctx, req.NamespacedName, e); err != nil {
+		if kerrors.IsNotFound(err) {
+			logger.Info("endpoint resource not found. Ignoring since object must be deleted")
+			return ctrl.Result{}, nil
+		}
 		return ctrl.Result{}, err
 	}
 
@@ -74,10 +80,15 @@ func (r *EndpointReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	err = r.reconcile(ctx, e)
+	if err != nil {
+		e.Status.Message = err.Error()
+	} else {
+		e.Status.Reset()
+	}
 
-	tries := 5
+	tries := 0
 	for tries < 5 {
-		_, updateErr := Update(ctx, r.Client, e, func() error { return nil })
+		updateErr := r.Status().Update(ctx, e)
 		if updateErr == nil {
 			break
 		}
@@ -87,13 +98,16 @@ func (r *EndpointReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		}
 	}
 
+	if errors.Is(err, neon.ErrRetryAgain) {
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	}
 	return ctrl.Result{}, err
 }
 
 func (r *EndpointReconciler) ExecuteFinalizer(ctx context.Context, endpoint *neontechv1alpha1.Endpoint) error {
 	logger := log.FromContext(ctx)
 	logger.Info("Reconciling deletion of endpoint", "name", endpoint.Name)
-	if _, err := r.NeonClient.DeleteEndpoint(ctx, endpoint); err != nil {
+	if _, err := r.NeonClient.DeleteEndpoint(ctx, r.Client, endpoint); err != nil {
 		return err
 	}
 	if ok := controllerutil.RemoveFinalizer(endpoint, neonFinalizer); ok {
@@ -107,37 +121,31 @@ func (r *EndpointReconciler) ExecuteFinalizer(ctx context.Context, endpoint *neo
 
 func (r *EndpointReconciler) reconcile(ctx context.Context, endpoint *neontechv1alpha1.Endpoint) error {
 	logger := log.FromContext(ctx)
-	_, err := r.NeonClient.GetEndpoint(ctx, endpoint.Name, &endpoint.Spec)
-
+	resp, err := r.NeonClient.GetEndpoint(ctx, r.Client, endpoint)
 	shouldCreate := false
 	if err != nil {
-		if errors.Is(err, neon.BranchNotFound) {
+		if !errors.Is(err, neon.ErrEndpointNotFound) {
 			return err
 		}
 		shouldCreate = true
 	}
 
 	if !shouldCreate {
+		endpoint.Status = neon.NewEndpointStatus(resp)
 		endpoint.Status.State = neontechv1alpha1.EndpointStateCreated
 		return nil
 	}
 
 	logger.Info("Creating endpoint", "name", endpoint.Name)
-	_, err = r.NeonClient.CreateEndpoint(ctx, &endpoint.Spec)
+	resp, err = r.NeonClient.CreateEndpoint(ctx, r.Client, endpoint)
 	if err != nil {
 		return err
 	}
 
+	endpoint.Status = neon.NewEndpointStatus(resp)
 	endpoint.Status.State = neontechv1alpha1.EndpointStateCreated
 
 	return nil
-}
-
-func (r *EndpointReconciler) updateStatusIfChanged(ctx context.Context, old, new *neontechv1alpha1.Endpoint) error {
-	if old.Status.State == new.Status.State {
-		return nil
-	}
-	return r.Client.Status().Update(ctx, new)
 }
 
 func (r *EndpointReconciler) updateState(ctx context.Context, endpoint *neontechv1alpha1.Endpoint, state neontechv1alpha1.EndpointState) error {

@@ -4,22 +4,35 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 
 	neontechv1alpha1 "github.com/evanshortiss/neon-kube-operator/api/v1alpha1"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func endpointSpecToCreateRequestBody(endpointSpec *neontechv1alpha1.EndpointSpec) map[string]any {
+type RetryError error
+
+var (
+	ErrRetryAgain RetryError = errors.New("retry again")
+)
+
+func endpointSpecToCreateRequestBody(e *neontechv1alpha1.Endpoint, branchId, projectId string) map[string]any {
 	body := make(map[string]any)
 	endpoint := make(map[string]any)
 
-	endpoint["branch_id"] = endpointSpec.BranchId
+	endpointSpec := e.Spec
+
+	endpoint["branch_id"] = branchId
+	endpoint["project_id"] = projectId
+	endpoint["type"] = endpointSpec.Type
 	if endpointSpec.RegionId != nil {
 		endpoint["region_id"] = endpointSpec.RegionId
 	}
-	endpoint["type"] = endpointSpec.Type
 	if endpointSpec.Settings != nil {
 		endpoint["settings"] = endpointSpec.Settings
 	}
@@ -53,10 +66,14 @@ func endpointSpecToCreateRequestBody(endpointSpec *neontechv1alpha1.EndpointSpec
 	return body
 }
 
-func (c *Client) CreateEndpoint(ctx context.Context, endpointSpec *neontechv1alpha1.EndpointSpec) (map[string]any, error) {
-	url := fmt.Sprintf("https://console.neon.tech/api/v2/projects/%s/endpoints", endpointSpec.ProjectId)
+func (c *Client) CreateEndpoint(ctx context.Context, k8sClient client.Client, e *neontechv1alpha1.Endpoint) (map[string]any, error) {
+	branchId, projectId, err := getBranchProjectId(ctx, k8sClient, e)
+	if err != nil {
+		return nil, err
+	}
+	url := fmt.Sprintf("https://console.neon.tech/api/v2/projects/%s/endpoints", projectId)
 
-	reqData, err := json.Marshal(endpointSpec)
+	reqData, err := json.Marshal(endpointSpecToCreateRequestBody(e, branchId, projectId))
 	if err != nil {
 		return nil, err
 	}
@@ -92,8 +109,37 @@ func (c *Client) CreateEndpoint(ctx context.Context, endpointSpec *neontechv1alp
 	return m, nil
 }
 
-func (c *Client) DeleteEndpoint(ctx context.Context, endpoint *neontechv1alpha1.Endpoint) (map[string]any, error) {
-	url := fmt.Sprintf("https://console.neon.tech/api/v2/projects/%s/endpoints/%s", endpoint.Spec.ProjectId, endpoint.Name)
+func getBranchProjectId(ctx context.Context, k8sClient client.Client, e *neontechv1alpha1.Endpoint) (string, string, error) {
+	var branchId, projectId string
+	if e.Spec.BranchFrom.BranchRef != "" {
+		branch := neontechv1alpha1.Branch{}
+		err := k8sClient.Get(ctx, types.NamespacedName{Name: e.Spec.BranchFrom.BranchRef, Namespace: e.Namespace}, &branch)
+		if kerrors.IsNotFound(err) {
+			return "", "", fmt.Errorf("branch is not found yet, %w", ErrRetryAgain)
+		}
+		if err != nil {
+			return "", "", err
+		}
+		if !branch.Status.State.Exists() {
+			return "", "", fmt.Errorf("branch status is not updated yet, %w", ErrRetryAgain)
+		}
+		branchId = branch.Status.Id
+		projectId = branch.Spec.ProjectId
+
+	} else {
+		branchId = e.Spec.BranchFrom.BranchId
+		projectId = e.Spec.BranchFrom.ProjectId
+	}
+
+	return branchId, projectId, nil
+}
+
+func (c *Client) DeleteEndpoint(ctx context.Context, k8sClient client.Client, e *neontechv1alpha1.Endpoint) (map[string]any, error) {
+	_, projectId, err := getBranchProjectId(ctx, k8sClient, e)
+	if err != nil {
+		return nil, err
+	}
+	url := fmt.Sprintf("https://console.neon.tech/api/v2/projects/%s/endpoints/%s", projectId, e.Status.Id)
 	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
 	if err != nil {
 		return nil, err
@@ -108,7 +154,7 @@ func (c *Client) DeleteEndpoint(ctx context.Context, endpoint *neontechv1alpha1.
 
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 && resp.StatusCode != 404 {
-		return nil, fmt.Errorf("Failed to delete endpoint: %s", resp.Status)
+		return nil, fmt.Errorf("failed to delete endpoint: %s", resp.Status)
 	}
 
 	data, err := io.ReadAll(resp.Body)
@@ -125,8 +171,18 @@ func (c *Client) DeleteEndpoint(ctx context.Context, endpoint *neontechv1alpha1.
 	return m, nil
 }
 
-func (c *Client) GetEndpoint(ctx context.Context, name string, spec *neontechv1alpha1.EndpointSpec) (map[string]any, error) {
-	url := fmt.Sprintf("https://console.neon.tech/api/v2/projects/%s/endpoints/%s", spec.ProjectId, name)
+var ErrEndpointNotFound = errors.New("branch not found")
+
+func (c *Client) GetEndpoint(ctx context.Context, k8sClient client.Client, e *neontechv1alpha1.Endpoint) (map[string]any, error) {
+	if e.Status.Id == "" {
+		return nil, ErrEndpointNotFound
+	}
+	_, projectId, err := getBranchProjectId(ctx, k8sClient, e)
+	if err != nil {
+		return nil, err
+	}
+
+	url := fmt.Sprintf("https://console.neon.tech/api/v2/projects/%s/endpoints/%s", projectId, e.Status.Id)
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, err
@@ -141,7 +197,10 @@ func (c *Client) GetEndpoint(ctx context.Context, name string, spec *neontechv1a
 
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("Failed to get endpoint: %s", resp.Status)
+		if resp.StatusCode == 404 {
+			return nil, ErrEndpointNotFound
+		}
+		return nil, fmt.Errorf("failed to get endpoint: %s", resp.Status)
 	}
 
 	bytes, err := io.ReadAll(resp.Body)

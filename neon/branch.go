@@ -12,18 +12,17 @@ import (
 	neontechv1alpha1 "github.com/evanshortiss/neon-kube-operator/api/v1alpha1"
 )
 
-func branchSpecToCreateRequestBody(branchSpec *neontechv1alpha1.BranchSpec) map[string]any {
+func branchSpecToCreateRequestBody(b *neontechv1alpha1.Branch) map[string]any {
 	body := make(map[string]any)
+	branchSpec := b.Spec
+	branch := make(map[string]any)
+	branch["name"] = b.Name
 
-	if branchSpec.ParentId != nil || (branchSpec.ParentStartPoint != nil && (branchSpec.ParentStartPoint.Lsn != nil || branchSpec.ParentStartPoint.Timestamp != nil)) {
-		branch := make(map[string]any)
+	if branchSpec.ParentId != nil {
+		branch["parent_id"] = branchSpec.ParentId
+	}
 
-		if branchSpec.ParentId != nil {
-			branch["parent_id"] = branchSpec.ParentId
-		}
-
-		// TODO: name????
-
+	if branchSpec.ParentStartPoint != nil {
 		if branchSpec.ParentStartPoint.Lsn != nil {
 			branch["parent_lsn"] = branchSpec.ParentStartPoint.Lsn
 		}
@@ -31,17 +30,17 @@ func branchSpecToCreateRequestBody(branchSpec *neontechv1alpha1.BranchSpec) map[
 		if branchSpec.ParentStartPoint.Timestamp != nil {
 			branch["parent_timestamp"] = branchSpec.ParentStartPoint.Timestamp
 		}
-
-		body["branch"] = branch
 	}
+
+	body["branch"] = branch
 
 	return body
 }
 
-func (c *Client) CreateBranch(ctx context.Context, branchSpec *neontechv1alpha1.BranchSpec) (map[string]any, error) {
-	url := fmt.Sprintf("https://console.neon.tech/api/v2/projects/%s/branches", branchSpec.ProjectId)
+func (c *Client) CreateBranch(ctx context.Context, branch *neontechv1alpha1.Branch) (map[string]any, error) {
+	url := fmt.Sprintf("https://console.neon.tech/api/v2/projects/%s/branches", branch.Spec.ProjectId)
 
-	reqData, err := json.Marshal(branchSpecToCreateRequestBody(branchSpec))
+	reqData, err := json.Marshal(branchSpecToCreateRequestBody(branch))
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +58,7 @@ func (c *Client) CreateBranch(ctx context.Context, branchSpec *neontechv1alpha1.
 	}
 
 	defer resp.Body.Close()
-	if resp.StatusCode != 201 {
+	if resp.StatusCode != 201 { // TODO: add already exists
 		return nil, fmt.Errorf("failed to create branch: %s", resp.Status)
 	}
 
@@ -111,10 +110,13 @@ func (c *Client) DeleteBranch(ctx context.Context, branch *neontechv1alpha1.Bran
 }
 
 var (
-	BranchNotFound = errors.New("branch not found")
+	ErrBranchNotFound = errors.New("branch not found")
 )
 
 func (c *Client) GetBranch(ctx context.Context, name string, branch *neontechv1alpha1.Branch) (map[string]any, error) {
+	if branch.Status.Id == "" {
+		return nil, ErrBranchNotFound
+	}
 	url := fmt.Sprintf("https://console.neon.tech/api/v2/projects/%s/branches/%s", branch.Spec.ProjectId, branch.Status.Id)
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
@@ -129,7 +131,7 @@ func (c *Client) GetBranch(ctx context.Context, name string, branch *neontechv1a
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
 		if resp.StatusCode == 404 {
-			return nil, BranchNotFound
+			return nil, ErrBranchNotFound
 		}
 		return nil, fmt.Errorf("failed to get branch %s", resp.Status)
 	}
@@ -159,4 +161,18 @@ func NewBranchStatus(response map[string]any) neontechv1alpha1.BranchStatus {
 	}
 
 	return branchStatus
+}
+
+func NewEndpointStatus(response map[string]any) neontechv1alpha1.EndpointStatus {
+	var es neontechv1alpha1.EndpointStatus
+	if branch, ok := response["endpoint"].(map[string]any); ok {
+		es.Id, _ = branch["id"].(string)
+		es.CurrentState, _ = branch["current_state"].(string)
+		es.PendingState, _ = branch["pending_state"].(string)
+		es.Host, _ = branch["host"].(string)
+		es.CreatedAt, _ = branch["created_at"].(string)
+		es.UpdatedAt, _ = branch["updated_at"].(string)
+	}
+
+	return es
 }

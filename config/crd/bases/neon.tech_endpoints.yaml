@@ -39,17 +39,24 @@ spec:
                 type: integer
               autoscalingLimitMinCu:
                 type: integer
-              branchId:
-                type: string
               disabled:
                 type: boolean
+              from:
+                description: 'INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
+                  Important: Run "make" to regenerate code after modifying this file'
+                properties:
+                  branchId:
+                    type: string
+                  branchRef:
+                    type: string
+                  projectId:
+                    type: string
+                type: object
               passwordless_access:
                 type: boolean
               poolerEnabled:
                 type: boolean
               poolerMode:
-                type: string
-              projectId:
                 type: string
               provisioner:
                 type: string
@@ -65,17 +72,36 @@ spec:
               type:
                 type: string
             required:
-            - branchId
-            - projectId
+            - from
             - type
             type: object
           status:
             description: EndpointStatus defines the observed state of Endpoint
             properties:
+              createdAt:
+                type: string
+              currentState:
+                type: string
+              host:
+                type: string
+              id:
+                type: string
+              message:
+                type: string
+              pendingState:
+                type: string
               state:
                 type: string
+              updateAt:
+                type: string
             required:
+            - createdAt
+            - currentState
+            - host
+            - id
+            - pendingState
             - state
+            - updateAt
             type: object
         type: object
     served: true

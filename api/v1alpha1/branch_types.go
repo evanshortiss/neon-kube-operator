@@ -42,6 +42,7 @@ type Parent struct {
 // BranchStatus defines the observed state of Branch
 type BranchStatus struct {
 	State     BranchState `json:"state"`
+	Message   string      `json:"message"`
 	Id        string      `json:"id"`
 	Name      string      `json:"name"`
 	ProjectId string      `json:"projectId"`
@@ -50,6 +51,10 @@ type BranchStatus struct {
 	Primary   bool        `json:"primary"`
 	CreatedAt string      `json:"createdAt"`
 	UpdatedAt string      `json:"updateAt"`
+}
+
+func (bs *BranchStatus) Reset() {
+	bs.Message = ""
 }
 
 type BranchState string
