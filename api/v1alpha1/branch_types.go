@@ -60,6 +60,10 @@ const (
 	BranchStateDeleting BranchState = "deleting"
 )
 
+func (b BranchState) Exists() bool {
+	return b == BranchStateCreated || b == BranchStateDeleting
+}
+
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 

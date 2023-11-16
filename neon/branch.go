@@ -78,7 +78,7 @@ func (c *Client) CreateBranch(ctx context.Context, branchSpec *neontechv1alpha1.
 }
 
 func (c *Client) DeleteBranch(ctx context.Context, branch *neontechv1alpha1.Branch) (map[string]any, error) {
-	url := fmt.Sprintf("https://console.neon.tech/api/v2/projects/%s/branches/%s", branch.Spec.ProjectId, branch.Name)
+	url := fmt.Sprintf("https://console.neon.tech/api/v2/projects/%s/branches/%s", branch.Spec.ProjectId, branch.Status.Id)
 	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
 	if err != nil {
 		return nil, err
@@ -114,8 +114,8 @@ var (
 	BranchNotFound = errors.New("branch not found")
 )
 
-func (c *Client) GetBranch(ctx context.Context, name string, spec *neontechv1alpha1.BranchSpec) (map[string]any, error) {
-	url := fmt.Sprintf("https://console.neon.tech/api/v2/projects/%s/branches/%s", spec.ProjectId, name)
+func (c *Client) GetBranch(ctx context.Context, name string, branch *neontechv1alpha1.Branch) (map[string]any, error) {
+	url := fmt.Sprintf("https://console.neon.tech/api/v2/projects/%s/branches/%s", branch.Spec.ProjectId, branch.Status.Id)
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, err

@@ -77,9 +77,9 @@ func (r *BranchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	err = r.reconcile(ctx, b)
 
-	tries := 5
+	tries := 0
 	for tries < 5 {
-		_, updateErr := Update(ctx, r.Client, b, func() error { return nil })
+		updateErr := r.Status().Update(ctx, b)
 		if updateErr == nil {
 			break
 		}
@@ -94,6 +94,9 @@ func (r *BranchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 func (r *BranchReconciler) ExecuteFinalizer(ctx context.Context, branch *neontechv1alpha1.Branch) error {
 	logger := log.FromContext(ctx)
+	if branch.Status.Id == "" {
+		return nil
+	}
 	logger.Info("Reconciling deletion of branch", "name", branch.Name)
 	if _, err := r.NeonClient.DeleteBranch(ctx, branch); err != nil {
 		return err
@@ -109,7 +112,7 @@ func (r *BranchReconciler) ExecuteFinalizer(ctx context.Context, branch *neontec
 
 func (r *BranchReconciler) reconcile(ctx context.Context, branch *neontechv1alpha1.Branch) error {
 	logger := log.FromContext(ctx)
-	resp, err := r.NeonClient.GetBranch(ctx, branch.Name, &branch.Spec)
+	resp, err := r.NeonClient.GetBranch(ctx, branch.Name, branch)
 	shouldCreate := false
 	if err != nil {
 		if !errors.Is(err, neon.BranchNotFound) {
