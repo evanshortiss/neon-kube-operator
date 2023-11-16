@@ -46,6 +46,7 @@ type BranchReconciler struct {
 //+kubebuilder:rbac:groups=neon.tech,resources=branches,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=neon.tech,resources=branches/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=neon.tech,resources=branches/finalizers,verbs=update
+//+kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -122,7 +123,7 @@ func (r *BranchReconciler) ExecuteFinalizer(ctx context.Context, branch *neontec
 
 func (r *BranchReconciler) reconcile(ctx context.Context, branch *neontechv1alpha1.Branch) error {
 	logger := log.FromContext(ctx)
-	resp, err := r.NeonClient.GetBranch(ctx, branch.Name, branch)
+	resp, err := r.NeonClient.GetBranch(ctx, branch)
 	shouldCreate := false
 	if err != nil {
 		if !errors.Is(err, neon.ErrBranchNotFound) {

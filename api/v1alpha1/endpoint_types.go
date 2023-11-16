@@ -30,6 +30,7 @@ type EndpointSpec struct {
 	BranchFrom            BranchFrom        `json:"from"`
 	Type                  string            `json:"type"`
 	RegionId              *string           `json:"regionId,omitempty"`
+	IncludeCredentials    bool              `json:"includeCredentials,omitempty"`
 	Settings              map[string]string `json:"settings,omitempty"`
 	AutoscalingLimitMinCu *int              `json:"autoscalingLimitMinCu,omitempty"`
 	AutoscalingLimitMaxCu *int              `json:"autoscalingLimitMaxCu,omitempty"`

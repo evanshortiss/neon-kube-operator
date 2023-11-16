@@ -7,3 +7,4 @@ spec:
   from: 
     branchRef:  branch-sample
   type: read_only
+  includeCredentials: true

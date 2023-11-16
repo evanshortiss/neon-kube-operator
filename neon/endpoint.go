@@ -67,7 +67,7 @@ func endpointSpecToCreateRequestBody(e *neontechv1alpha1.Endpoint, branchId, pro
 }
 
 func (c *Client) CreateEndpoint(ctx context.Context, k8sClient client.Client, e *neontechv1alpha1.Endpoint) (map[string]any, error) {
-	branchId, projectId, err := getBranchProjectId(ctx, k8sClient, e)
+	branchId, projectId, err := GetBranchProjectId(ctx, k8sClient, e)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +109,7 @@ func (c *Client) CreateEndpoint(ctx context.Context, k8sClient client.Client, e 
 	return m, nil
 }
 
-func getBranchProjectId(ctx context.Context, k8sClient client.Client, e *neontechv1alpha1.Endpoint) (string, string, error) {
+func GetBranchProjectId(ctx context.Context, k8sClient client.Client, e *neontechv1alpha1.Endpoint) (string, string, error) {
 	var branchId, projectId string
 	if e.Spec.BranchFrom.BranchRef != "" {
 		branch := neontechv1alpha1.Branch{}
@@ -135,7 +135,7 @@ func getBranchProjectId(ctx context.Context, k8sClient client.Client, e *neontec
 }
 
 func (c *Client) DeleteEndpoint(ctx context.Context, k8sClient client.Client, e *neontechv1alpha1.Endpoint) (map[string]any, error) {
-	_, projectId, err := getBranchProjectId(ctx, k8sClient, e)
+	_, projectId, err := GetBranchProjectId(ctx, k8sClient, e)
 	if err != nil {
 		return nil, err
 	}
@@ -177,7 +177,7 @@ func (c *Client) GetEndpoint(ctx context.Context, k8sClient client.Client, e *ne
 	if e.Status.Id == "" {
 		return nil, ErrEndpointNotFound
 	}
-	_, projectId, err := getBranchProjectId(ctx, k8sClient, e)
+	_, projectId, err := GetBranchProjectId(ctx, k8sClient, e)
 	if err != nil {
 		return nil, err
 	}

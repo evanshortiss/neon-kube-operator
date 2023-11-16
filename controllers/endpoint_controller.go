@@ -19,10 +19,14 @@ package controllers
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -39,6 +43,13 @@ type EndpointReconciler struct {
 
 	NeonClient *neon.Client
 }
+
+const (
+	secretNameTemplate          = "neon-%s-host"
+	secretHostField             = "host"
+	hostTemplateWithCredentials = "postgresql://%s:%s@%s/neondb?sslmode=require"
+	hostTemplate                = "%s"
+)
 
 //+kubebuilder:rbac:groups=neon.tech,resources=endpoints,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=neon.tech,resources=endpoints/status,verbs=get;update;patch
@@ -130,22 +141,70 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, endpoint *neontechv1
 		shouldCreate = true
 	}
 
-	if !shouldCreate {
-		endpoint.Status = neon.NewEndpointStatus(resp)
-		endpoint.Status.State = neontechv1alpha1.EndpointStateCreated
-		return nil
-	}
-
-	logger.Info("Creating endpoint", "name", endpoint.Name)
-	resp, err = r.NeonClient.CreateEndpoint(ctx, r.Client, endpoint)
-	if err != nil {
-		return err
+	if shouldCreate {
+		logger.Info("Creating endpoint", "name", endpoint.Name)
+		resp, err = r.NeonClient.CreateEndpoint(ctx, r.Client, endpoint)
+		if err != nil {
+			return err
+		}
 	}
 
 	endpoint.Status = neon.NewEndpointStatus(resp)
 	endpoint.Status.State = neontechv1alpha1.EndpointStateCreated
 
+	err = r.reconcileSecret(ctx, endpoint)
+	if err != nil {
+		return err
+	}
 	return nil
+}
+
+func (r *EndpointReconciler) reconcileSecret(ctx context.Context, e *neontechv1alpha1.Endpoint) error {
+	logger := log.FromContext(ctx)
+
+	cm := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf(secretNameTemplate, e.Name),
+			Namespace: e.Namespace,
+		},
+		Data: make(map[string][]byte),
+	}
+
+	err := controllerutil.SetControllerReference(e, cm, r.Scheme)
+	if err != nil {
+		return fmt.Errorf("failed to set owner reference on Secret: %w", err)
+	}
+
+	hostString := ""
+	if e.Spec.IncludeCredentials {
+		branchId, projectId, err := neon.GetBranchProjectId(ctx, r.Client, e)
+		if err != nil {
+			return err
+		}
+		role, err := r.NeonClient.GetFirstRole(ctx, projectId, branchId)
+		if err != nil {
+			return err
+		}
+		pass, err := r.NeonClient.GetRolePassword(ctx, projectId, branchId, role)
+		if err != nil {
+			return err
+		}
+		hostString = fmt.Sprintf(hostTemplateWithCredentials, role, pass, e.Status.Host)
+	} else {
+		hostString = fmt.Sprintf(hostTemplate, e.Status.Host)
+	}
+
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		result, err := controllerutil.CreateOrUpdate(ctx, r.Client, cm, func() error {
+			cm.Data[secretHostField] = []byte(hostString)
+
+			return nil
+		})
+		if result != controllerutil.OperationResultNone {
+			logger.Info("Operation result", "result", result)
+		}
+		return err
+	})
 }
 
 func (r *EndpointReconciler) updateState(ctx context.Context, endpoint *neontechv1alpha1.Endpoint, state neontechv1alpha1.EndpointState) error {

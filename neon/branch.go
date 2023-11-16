@@ -113,7 +113,7 @@ var (
 	ErrBranchNotFound = errors.New("branch not found")
 )
 
-func (c *Client) GetBranch(ctx context.Context, name string, branch *neontechv1alpha1.Branch) (map[string]any, error) {
+func (c *Client) GetBranch(ctx context.Context, branch *neontechv1alpha1.Branch) (map[string]any, error) {
 	if branch.Status.Id == "" {
 		return nil, ErrBranchNotFound
 	}
